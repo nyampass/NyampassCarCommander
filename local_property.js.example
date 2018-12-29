@@ -1,0 +1,2 @@
+module.exports.forward_command = new Buffer([0x00, 0x00, 0x00, 0x00]);
+module.exports.forward_command = new Buffer([0x01, 0x01, 0x01, 0x01]);
