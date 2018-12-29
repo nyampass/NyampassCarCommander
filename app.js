@@ -6,14 +6,33 @@ const ServiceUUIDs = ["713D0000503E4C75BA943148F18D941E".toLowerCase()];
 const CharacteristicUUIDs = ["713D0003503E4C75BA943148F18D941E".toLowerCase()];
 let Direction = process.argv[2];
 
+function timeout(milli, callback){
+  return new Promise((res, rej) => {
+    let timer = setTimeout(() => {
+      rej('Time out.');
+    }, milli);
+
+    callback(res, rej, timer);
+  });
+}
+
 function connect(peripheral){
   return new Promise((res, rej) => {
-    peripheral.connect((err) => {
-      console.log('connect: ', err);
-      if(err) rej();
-      else res();
-    });
-  })
+    timeout(5000, (timer_res, timer_rej, timer) => {
+      peripheral.connect((err) => {
+        console.log('connect: ', err);
+        clearTimeout(timer);
+        if(err) timer_rej(err);
+        else timer_res();
+      });
+    })
+    .then(() => {
+      res();
+    })
+    .catch((err) => {
+      rej(err);
+    })
+  });
 }
 
 function disconnect(peripheral){
@@ -27,11 +46,20 @@ function disconnect(peripheral){
 
 function findService(peripheral, uuids){
   return new Promise((res, rej) => {
-    peripheral.discoverServices(uuids, (err, services) => {
-      console.log('Services: ', err);
-      if(err) rej(err);
-      else if(services.length <= 0) rej('No Services');
-      else res(services);
+    timeout(5000, (timer_res, timer_rej, timer) => {
+      peripheral.discoverServices(uuids, (err, services) => {
+        console.log('Services: ', err);
+        clearTimeout(timer);
+        if(err) timer_rej(err);
+        else if(services.length <= 0) timer_rej('No Services');
+        else timer_res(services);
+      });
+    })
+    .then((services) => {
+      res(services);
+    })
+    .catch((err) => {
+      rej(err);
     });
   });
 }
@@ -92,12 +120,13 @@ noble.on('discover', function(peripheral) {
         disconnect(peripheral)
           .then(() => {
             console.log('Disconnected')
-            process.exit(1);
+            process.exit(0);
           })
           .catch(() => { console.log('Failed to disconnect') });
       })
       .catch((err) => {
         console.log('Error: ', err);
+        if(err == 'Time out.') process.exit(1);
 	disconnect(peripheral)
           .then(() => {
             console.log('Disconnected');
